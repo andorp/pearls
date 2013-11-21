@@ -4,6 +4,7 @@ module Monad where
 
 -- We use the applicative library
 import Control.Applicative
+import Data.Monoid
 
 {-
 
@@ -41,8 +42,8 @@ class (Functor c) => Monad c where
 
 in Haskell we use the Kleisli triplet instead of the original notation
 
-class Monad m where
-  return :: a -> m a
+class Monad c where
+  return :: a -> c a
   (>>=)  :: c a -> (a -> c b) -> c b
 
 Here are some examples with the definition of monad used
@@ -140,7 +141,7 @@ instance Monad' (Reader r) where
   join (Reader fr) = Reader (\r -> unReader (fr r) r)
 
 -- Reader operations
-  
+
 readVal :: Reader r r
 readVal = Reader id
 
@@ -152,6 +153,28 @@ reader = runReader 5 $ do
   r <- readVal
   y <- return 2
   return (x + r + y)
+
+-- * Example: Writer
+
+newtype Writer w a = Writer { runWriter :: (a, w) }
+
+instance Functor (Writer w) where
+  fmap f m  = Writer $ case runWriter m of
+                (x,w) -> (f x, w)
+
+instance (Monoid w) => Applicative (Writer w) where
+  pure x = Writer (x, mempty)
+  (Writer (f,w)) <*> (Writer (x,w')) = Writer (f x, w <> w')
+
+instance (Monoid w) => Monad' (Writer w) where
+  join (Writer (Writer (x, w), w')) = Writer (x, w <> w')
+
+tell :: (Monoid w) => w -> Writer w ()
+tell w = Writer ((),w)
+
+listen :: (Monoid w) => Writer w a -> Writer w (a, w)
+listen m = Writer $ case runWriter m of
+             (x, w) -> ((x, w), w)
 
 -- * Example: State
 
