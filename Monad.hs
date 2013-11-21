@@ -87,6 +87,35 @@ maybe = do
   x2 <- Nothing'
   return (x1 + x2)
 
+-- * Example: Error
+
+newtype Error e a = Error { runError :: Either e a }
+
+instance Functor (Error e) where
+  fmap _ (Error (Left e))  = Error (Left e)
+  fmap f (Error (Right x)) = Error (Right (f x))
+
+instance Applicative (Error e) where
+  pure x = Error (Right x)
+  f <*> x = Error $ case runError f of
+              Left  e -> Left e
+              Right g -> case runError x of
+                           Left  e -> Left e
+                           Right y -> Right (g y)
+
+instance Monad' (Error e) where
+  join m = Error $ case runError m of
+                     Left  e -> Left e
+                     Right x -> runError x
+
+throwError :: e -> Error e ()
+throwError e = Error (Left e)
+
+catch :: Error e a -> (e -> Error e a) -> Error e a
+catch block handler = Error $ case runError block of
+                        Left e  -> runError (handler e)
+                        Right x -> Right x
+
 -- * Example: List
 
 newtype List a = List { unList :: [a] }
